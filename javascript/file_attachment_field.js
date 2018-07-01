@@ -39,10 +39,62 @@ var UploadInterface = function (node, backend) {
     this.settings.previewsContainer = this.node.querySelector('[data-container]');
     this.settings.fallback = UploadInterface.prototype.fallback.bind(this);
     this.settings.accept = UploadInterface.prototype.accept.bind(this);
-    
-    if (document.documentElement.classList && this.node.classList.contains('uploadable')) {
+
+    // define the parameters needed for chunking by the server
+    this.settings.params = function (files, xhr, chunk) {
+        if (chunk) {
+            return {
+                dzUuid: chunk.file.upload.uuid,
+                dzChunkIndex: chunk.index,
+                dzTotalFileSize: chunk.file.size,
+                dzCurrentChunkSize: chunk.dataBlock.data.size,
+                dzTotalChunkCount: chunk.file.upload.totalChunkCount,
+                dzChunkByteOffset: chunk.index * this.options.chunkSize,
+                dzChunkSize: this.options.chunkSize,
+                dzFilename: chunk.file.name
+        };
+        }
+    };
+
+    console.log('THIS', this);
+
+    // make an ajax request
+    this.settings.chunksUploaded = function (file, done) {
+        // All chunks have been uploaded. Perform any other actions
+        currentFile = file;
+
+        console.log('Chunks uploaded ', node);
+        console.log(file);
+
+        var settings = JSON.parse(node.getAttribute('data-config'));
+
+        // This calls server-side code to merge all chunks for the currentFile
+        $.ajax({
+            type: "PUT",
+            url: settings.post_chunk_url + '?uuid=' + currentFile.upload.uuid
+            + "&fileName=" + encodeURIComponent(currentFile.name)
+            + "&expectedBytes=" + currentFile.size
+            + "&totalChunks=" + currentFile.upload.totalChunkCount,
+            success: function (data) {
+                // Must call done() if successful
+                done();
+            },
+            error: function (msg) {
+                currentFile.accepted = false;
+                this.backend._errorProcessing([currentFile], msg.responseText);
+            }
+        });
+    };
+
+
+        console.log('Settings', this.settings);
+
+
+        if (document.documentElement.classList && this.node.classList.contains('uploadable')) {
+        console.log('t1');
         this.backend = new backend(this.node, this.settings);
     } else if (this.node.className.indexOf('uploadable') !== -1) {
+        console.log('t2');
         this.backend = new backend(this.node, this.settings);
     }
 
