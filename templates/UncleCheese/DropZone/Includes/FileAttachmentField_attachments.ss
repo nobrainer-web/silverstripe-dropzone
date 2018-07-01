@@ -15,7 +15,7 @@
                             <% if $File.Orientation > -1 %>
                                 src="$File.CroppedImage($Scope.SelectedThumbnailWidth, $Scope.SelectedThumbnailHeight).URL"
                             <% else %>
-                                src="$Scope.ThumbnailsDir/{$File.Extension.LowerCase}.png" onerror="this.src='$Scope.ThumbnailsDir/_blank.png'" onload="this.parentNode.style.backgroundImage='url('+this.src+')';this.style.display='none';"
+                                src="$Scope.ThumbnailsDir/{$File.Extension.LowerCase}.png" onerror="this.src='$resourceURL(unclecheese/dropzone:images/_blank.png'" onload="this.parentNode.style.backgroundImage='url('+this.src+')';this.style.display='none';"
                             <% end_if %>
                         >
                 </span>
