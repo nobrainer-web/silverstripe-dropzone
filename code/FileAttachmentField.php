@@ -22,6 +22,7 @@ use SilverStripe\Core\Config\Config;
 use SilverStripe\Core\Convert;
 use SilverStripe\Assets\Folder;
 use SilverStripe\Forms\FileField;
+use SilverStripe\Core\Manifest\ModuleResourceLoader;
 use SilverStripe\Forms\TreeDropdownField;
 use SilverStripe\Forms\GridField\GridFieldConfig;
 use SilverStripe\Forms\GridField\GridFieldSortableHeader;
@@ -48,6 +49,8 @@ class FileAttachmentField extends FileField {
      */
     private static $allowed_actions = array (
         'upload',
+        'uploadchunk',
+        'chunksuploaded',
         'handleSelect',
     );
 
@@ -217,7 +220,12 @@ class FileAttachmentField extends FileField {
         Requirements::css('unclecheese/dropzone:/css/file_attachment_field.css');
 
         if(!$this->getSetting('url')) {
-            $this->settings['url'] = $this->Link('upload');
+            $this->settings['url'] = $this->Link('uploadchunk');
+            $this->settings['post_chunk_url'] = $this->Link('chunksuploaded');
+            //$this->settings['chunksUploaded'] = $this->Link('chunksuploaded');
+            $this->settings['forceChunking'] = true;
+            $this->settings['chunking'] = true;
+            $this->settings['uploadMultiple'] = false;
         }
 
         if(!$this->getSetting('maxFilesize')) {
@@ -225,7 +233,9 @@ class FileAttachmentField extends FileField {
         }
         // The user may not have opted into a multiple upload. If the form field
         // is attached to a record that has a multi relation, set that automatically.
-        $this->settings['uploadMultiple'] = $this->IsMultiple();
+       // @todo where is this being set?  $this->settings['uploadMultiple'] = $this->IsMultiple();
+
+        error_log('Upload multiple:' . $this->IsMultiple());
 
         // Auto filter images if assigned to an Image relation
         if($class = $this->getFileClass()) {
@@ -319,6 +329,7 @@ class FileAttachmentField extends FileField {
      * @return  FileAttachmentField
      */
     public function setMultiple($bool) {
+        error_log('>>>> Setting uploadMultiple to ' . $bool);
         $this->settings['uploadMultiple'] = $bool;
 
         return $this;
@@ -815,6 +826,69 @@ class FileAttachmentField extends FileField {
     }
 
     /**
+     * Join the uploaded chunks together
+     *
+     * @param HTTPRequest $request
+     */
+    public function chunksuploaded(HTTPRequest $request)
+    {
+        error_log('Chunks uploaded');
+        error_log(print_r($request->getVars(), 1));
+        $numberOfChunks = $request->getVar('totalChunks');
+        $expectedBytes = $request->getVar('expectedBytes');
+        $fileName = $request->getVar('fileName');
+        $uuid = $request->getVar('uuid');
+        error_log('Number of chunks ' . $numberOfChunks);
+        error_log('UUID ' . $uuid);
+
+        $tmp_dir = sys_get_temp_dir();
+        $targetFile = $tmp_dir . DIRECTORY_SEPARATOR . $uuid . DIRECTORY_SEPARATOR . $fileName;
+        for($i = 0; $i < $numberOfChunks; $i++) {
+            $chunkFile = $tmp_dir . DIRECTORY_SEPARATOR . $uuid . DIRECTORY_SEPARATOR . $i . '.chunk';
+            error_log('Chunk file: ' . $chunkFile);
+            $out_fp = fopen($targetFile, $i == 0 ? "wb" : "ab");
+
+            $append = $i > 0;
+            if ($append) {
+                file_put_contents($targetFile, fopen($chunkFile, 'r'), FILE_APPEND);
+            } else {
+                file_put_contents($targetFile, fopen($chunkFile, 'r'));
+            }
+        }
+    }
+
+    /**
+     * Move an uploaded chunk to /tmp/<uuid>/N.chunk
+     *
+     * @param HTTPRequest $request
+     */
+    public function uploadchunk(HTTPRequest $request)
+    {
+        error_log('Upload chunk');
+        error_log(print_r($request->params(), 1));
+
+        $chunkIndex = $request->postVar('dzChunkIndex');
+        $dzUuid = $request->postVar('dzUuid');
+        $dzTotalFileSize = $request->postVar('dzTotalFileSize');
+        $dzCurrentChunkSize = $request->postVar('dzCurrentChunkSize');
+        $dzTotalChunkCount = $request->postVar('dzTotalChunkCount');
+        $dzChunkByteOffset = $request->postVar('dzChunkByteOffset');
+        $dzChunkSize = $request->postVar('dzChunkSize');
+        $dzFilename = $request->postVar('dzFilename');
+        $chunkFileInfo = $_FILES['file'];
+        $chunkFilePath = $chunkFileInfo['tmp_name'];
+        $tmp_dir = sys_get_temp_dir();
+        $uploadDir = $tmp_dir . DIRECTORY_SEPARATOR . $dzUuid;
+        if (!file_exists($uploadDir)) {
+            mkdir($uploadDir);
+        }
+        $targetFilePath = $tmp_dir . DIRECTORY_SEPARATOR . $dzUuid . DIRECTORY_SEPARATOR . $chunkIndex . '.chunk';
+        error_log('Chunk file: ' . print_r($chunkFilePath, 1));
+        error_log('Target file path: ' . $targetFilePath);
+        rename($chunkFilePath, $targetFilePath);
+    }
+
+        /**
      * Action to handle upload of a single file
      * @note the PHP settings to consider here are file_uploads, upload_max_filesize, post_max_size, upload_tmp_dir
      *      file_uploads - when off, the $_FILES array will be empty
@@ -1034,7 +1108,7 @@ class FileAttachmentField extends FileField {
      * @return  string
      */
     public function RootThumbnailsDir() {
-        return $this->getSetting('thumbnailsDir') ?: 'unclecheese/dropzone:/images/file-icons';
+        return $this->getSetting('thumbnailsDir') ?: ModuleResourceLoader::resourceUrl('unclecheese/dropzone:/images/file-icons');
     }
 
     /**
@@ -1244,6 +1318,7 @@ class FileAttachmentField extends FileField {
      * @return mixed
      */
     protected function getSetting($setting) {
+        error_log('Settings: ' . print_r($this->settings, 1));
         if(isset($this->settings[$setting])) {
             return $this->settings[$setting];
         }
