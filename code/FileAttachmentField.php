@@ -220,12 +220,17 @@ class FileAttachmentField extends FileField {
         Requirements::css('unclecheese/dropzone:/css/file_attachment_field.css');
 
         if(!$this->getSetting('url')) {
-            $this->settings['url'] = $this->Link('uploadchunk');
-            $this->settings['post_chunk_url'] = $this->Link('chunksuploaded');
+            //$this->settings['url'] = $this->Link('upload');
             //$this->settings['chunksUploaded'] = $this->Link('chunksuploaded');
+
+            // for chunking
+
+            $this->settings['post_chunk_url'] = $this->Link('chunksuploaded');
+            $this->settings['url'] = $this->Link('uploadchunk');
             $this->settings['forceChunking'] = true;
             $this->settings['chunking'] = true;
             $this->settings['uploadMultiple'] = false;
+
         }
 
         if(!$this->getSetting('maxFilesize')) {
@@ -236,6 +241,7 @@ class FileAttachmentField extends FileField {
        // @todo where is this being set?  $this->settings['uploadMultiple'] = $this->IsMultiple();
 
         error_log('Upload multiple:' . $this->IsMultiple());
+        //$this->settings['uploadMultiple'] = $this->IsMultiple();
 
         // Auto filter images if assigned to an Image relation
         if($class = $this->getFileClass()) {
@@ -474,7 +480,7 @@ class FileAttachmentField extends FileField {
                 $this->name,
                 _t(
                     'FileAttachmentField.VALIDATION',
-                    'Invalid file ID sent.'
+                    'Invalid file ID sent T1.'
                 ),
                 "validation"
             );
@@ -490,7 +496,7 @@ class FileAttachmentField extends FileField {
                             $this->name,
                             _t(
                                 'FileAttachmentField.VALIDATION',
-                                'Invalid file ID sent.',
+                                'Invalid file ID sent T2.',
                                 array('id' => $id)
                             ),
                             "validation"
@@ -544,7 +550,9 @@ class FileAttachmentField extends FileField {
             //             If its a single value, its just re-populating the ID on DB data most likely.
             if (is_array($data[$this->getName()])) {
                 $ids = &$data[$this->getName()];
+                error_log('VALID IDS: ' . print_r($validIDs, 1));
                 foreach ($ids as $i => $id) {
+                    error_log('ID being checked: ' . $id);
                     if ($validIDs && !isset($validIDs[$id])) {
                         unset($ids[$i]);
                         $isInvalid = true;
@@ -832,21 +840,15 @@ class FileAttachmentField extends FileField {
      */
     public function chunksuploaded(HTTPRequest $request)
     {
-        error_log('Chunks uploaded');
-        error_log(print_r($request->getVars(), 1));
         $numberOfChunks = $request->getVar('totalChunks');
         $expectedBytes = $request->getVar('expectedBytes');
         $fileName = $request->getVar('fileName');
         $uuid = $request->getVar('uuid');
-        error_log('Number of chunks ' . $numberOfChunks);
-        error_log('UUID ' . $uuid);
 
         $tmp_dir = sys_get_temp_dir();
         $targetFile = $tmp_dir . DIRECTORY_SEPARATOR . $uuid . DIRECTORY_SEPARATOR . $fileName;
         for($i = 0; $i < $numberOfChunks; $i++) {
             $chunkFile = $tmp_dir . DIRECTORY_SEPARATOR . $uuid . DIRECTORY_SEPARATOR . $i . '.chunk';
-            error_log('Chunk file: ' . $chunkFile);
-            $out_fp = fopen($targetFile, $i == 0 ? "wb" : "ab");
 
             $append = $i > 0;
             if ($append) {
@@ -865,10 +867,7 @@ class FileAttachmentField extends FileField {
             'size' => $expectedBytes
         ];
 
-        error_log('Creating payload from ' . print_r($tmpFile, 1));
-
         $result = $this->extractFilesAsSilverStripeContent([$tmpFile], true);
-        error_log('RETURNED:' . print_r($result, 1));
         return $result;
     }
 
@@ -879,9 +878,6 @@ class FileAttachmentField extends FileField {
      */
     public function uploadchunk(HTTPRequest $request)
     {
-        error_log('Upload chunk');
-        error_log(print_r($request->params(), 1));
-
         $chunkIndex = $request->postVar('dzChunkIndex');
         $dzUuid = $request->postVar('dzUuid');
         $dzTotalFileSize = $request->postVar('dzTotalFileSize');
@@ -891,7 +887,6 @@ class FileAttachmentField extends FileField {
         $dzChunkSize = $request->postVar('dzChunkSize');
         $dzFilename = $request->postVar('dzFilename');
         $chunkFileInfo = $_FILES['file'];
-        error_log('Chunk file info: ' . print_r($chunkFileInfo, 1));
         $chunkFilePath = $chunkFileInfo['tmp_name'];
         $tmp_dir = sys_get_temp_dir();
         $uploadDir = $tmp_dir . DIRECTORY_SEPARATOR . $dzUuid;
@@ -899,8 +894,6 @@ class FileAttachmentField extends FileField {
             mkdir($uploadDir);
         }
         $targetFilePath = $tmp_dir . DIRECTORY_SEPARATOR . $dzUuid . DIRECTORY_SEPARATOR . $chunkIndex . '.chunk';
-        error_log('Chunk file: ' . print_r($chunkFilePath, 1));
-        error_log('Target file path: ' . $targetFilePath);
         rename($chunkFilePath, $targetFilePath);
     }
 
@@ -1286,7 +1279,6 @@ class FileAttachmentField extends FileField {
      * @return mixed
      */
     protected function getSetting($setting) {
-        error_log('Settings: ' . print_r($this->settings, 1));
         if(isset($this->settings[$setting])) {
             return $this->settings[$setting];
         }
@@ -1391,29 +1383,27 @@ class FileAttachmentField extends FileField {
      */
     public function extractFilesAsSilverStripeContent($tmpFiles, $chunked = false)
     {
+        error_log('---- extractFilesAsSilverStripeContent -----');
+
         $form = $this->getForm();
 
         $ids = array();
         foreach ($tmpFiles as $tmpFile) {
-            error_log('Processing tmp file');
+
+            error_log('Dealing with tmp file ' . print_r($tmpFile, 1));
 
             if ($tmpFile['error']) {
                 // http://php.net/manual/en/features.file-upload.errors.php
-                error_log('T1');
                 $user_message = $this->getUploadUserError($tmpFile['error']);
                 return $this->httpError(400, $user_message);
             }
             if ($relationClass = $this->getFileClass($tmpFile['name'])) {
-                error_log('T2');
                 $fileObject = new $relationClass();
             }
 
             try {
-                error_log('T3 - loading in file ' . print_r($tmpFile, 1));
                 // if chunked we have assembed a local file, if not then it's a normal PHP file upload
                 if ($chunked) {
-                    error_log('FILE NAME: ' . $this->getFolderName() . DIRECTORY_SEPARATOR
-                    . $tmpFile['name']);
                     $fileObject->setFromLocalFile($tmpFile['tmp_name'], $this->getFolderName() . DIRECTORY_SEPARATOR . $tmpFile['name']);
                     $fileObject->write();
                 } else {
@@ -1421,20 +1411,17 @@ class FileAttachmentField extends FileField {
                 }
 
                 $ids[] = $fileObject->ID;
-                error_log('T4 ID=' . $fileObject->ID);
+                error_log('FILE ID: ' . $fileObject->ID);
             } catch (Exception $e) {
-                error_log('T5');
                 $error_message = _t('FileAttachmentField.GENERALUPLOADERROR', 'Sorry, the file could not be saved at the current time, please try again later.');
                 return $this->httpError(400, $error_message);
             }
 
             if ($this->upload->isError()) {
-                error_log('T6');
                 return $this->httpError(400, implode(' ' . PHP_EOL, $this->upload->getErrors()));
             }
 
             if ($this->getTrackFiles()) {
-                error_log('T7');
                 $controller = Controller::has_curr() ? Controller::curr() : null;
                 $formClass = ($form) ? get_class($form) : '';
 
@@ -1458,7 +1445,6 @@ class FileAttachmentField extends FileField {
         }
 
         $this->addValidFileIDs($ids);
-        error_log('T8');
         $this->extend('onAfterUploadFiles', $ids);
         return new HTTPResponse(implode(',', $ids), 200);
     }

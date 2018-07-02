@@ -19,5 +19,7 @@
       "autoProcessQueue": true,
       "autoQueue": true,
       "addRemoveLinks": false,
-      "previewsContainer": null
+      "previewsContainer": null,
+      "chunking": true,
+      "chunkSize": 128
 }
