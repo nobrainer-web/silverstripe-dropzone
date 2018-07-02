@@ -855,6 +855,21 @@ class FileAttachmentField extends FileField {
                 file_put_contents($targetFile, fopen($chunkFile, 'r'));
             }
         }
+
+        // @todo check length of file and throw error if it's different
+
+        $tmpFile = [
+          'error' => false,
+          'tmp_name' => $targetFile,
+            'name' => $fileName,
+            'size' => $expectedBytes
+        ];
+
+        error_log('Creating payload from ' . print_r($tmpFile, 1));
+
+        $result = $this->extractFilesAsSilverStripeContent([$tmpFile], true);
+        error_log('RETURNED:' . print_r($result, 1));
+        return $result;
     }
 
     /**
@@ -876,6 +891,7 @@ class FileAttachmentField extends FileField {
         $dzChunkSize = $request->postVar('dzChunkSize');
         $dzFilename = $request->postVar('dzFilename');
         $chunkFileInfo = $_FILES['file'];
+        error_log('Chunk file info: ' . print_r($chunkFileInfo, 1));
         $chunkFilePath = $chunkFileInfo['tmp_name'];
         $tmp_dir = sys_get_temp_dir();
         $uploadDir = $tmp_dir . DIRECTORY_SEPARATOR . $dzUuid;
@@ -888,7 +904,7 @@ class FileAttachmentField extends FileField {
         rename($chunkFilePath, $targetFilePath);
     }
 
-        /**
+    /**
      * Action to handle upload of a single file
      * @note the PHP settings to consider here are file_uploads, upload_max_filesize, post_max_size, upload_tmp_dir
      *      file_uploads - when off, the $_FILES array will be empty
@@ -945,55 +961,7 @@ class FileAttachmentField extends FileField {
             $tmpFiles[] = $files;
         }
 
-        $ids = array ();
-        foreach($tmpFiles as $tmpFile) {
-            if($tmpFile['error']) {
-              // http://php.net/manual/en/features.file-upload.errors.php
-              $user_message = $this->getUploadUserError($tmpFile['error']);
-              return $this->httpError(400, $user_message);
-            }
-            if($relationClass = $this->getFileClass($tmpFile['name'])) {
-                $fileObject = new $relationClass();
-            }
-
-            try {
-                $this->upload->loadIntoFile($tmpFile, $fileObject, $this->getFolderName());
-                $ids[] = $fileObject->ID;
-            } catch (Exception $e) {
-              $error_message = _t('FileAttachmentField.GENERALUPLOADERROR', 'Sorry, the file could not be saved at the current time, please try again later.');
-              return $this->httpError(400, $error_message);
-            }
-
-            if ($this->upload->isError()) {
-                return $this->httpError(400, implode(' ' . PHP_EOL, $this->upload->getErrors()));
-            }
-
-            if ($this->getTrackFiles()) {
-                $controller = Controller::has_curr() ? Controller::curr() : null;
-                $formClass = ($form) ? get_class($form) : '';
-
-                $trackFile = FileAttachmentFieldTrack::create();
-                if ($controller instanceof LeftAndMain) {
-                    // If in CMS (store DataObject or Page)
-                    $formController = $form->getController();
-                    $trackFile->ControllerClass = $formController->class;
-                    if (!$formController instanceof LeftAndMain) {
-                        $trackFile->setRecord($formController->getRecord());
-                    }
-                } else if ($formClass !== Form::class) {
-                    $trackFile->ControllerClass = $formClass;
-                } else {
-                    // If using generic 'Form' instance, get controller
-                    $trackFile->ControllerClass = $controller->class;
-                }
-                $trackFile->FileID = $fileObject->ID;
-                $trackFile->write();
-            }
-        }
-
-        $this->addValidFileIDs($ids);
-        $this->extend('onAfterUploadFiles', $ids);
-        return new HTTPResponse(implode(',', $ids), 200);
+        return $this->extractFilesAsSilverStripeContent($tmpFiles);
     }
 
 
@@ -1412,6 +1380,87 @@ class FileAttachmentField extends FileField {
         }
 
         return Convert::array2json($data);
+    }
+
+    /**
+     * @param $tmpFiles
+     * @param $form
+     * @return HTTPResponse|void
+     * @throws \SilverStripe\Control\HTTPResponse_Exception
+     * @throws \SilverStripe\ORM\ValidationException
+     */
+    public function extractFilesAsSilverStripeContent($tmpFiles, $chunked = false)
+    {
+        $form = $this->getForm();
+
+        $ids = array();
+        foreach ($tmpFiles as $tmpFile) {
+            error_log('Processing tmp file');
+
+            if ($tmpFile['error']) {
+                // http://php.net/manual/en/features.file-upload.errors.php
+                error_log('T1');
+                $user_message = $this->getUploadUserError($tmpFile['error']);
+                return $this->httpError(400, $user_message);
+            }
+            if ($relationClass = $this->getFileClass($tmpFile['name'])) {
+                error_log('T2');
+                $fileObject = new $relationClass();
+            }
+
+            try {
+                error_log('T3 - loading in file ' . print_r($tmpFile, 1));
+                // if chunked we have assembed a local file, if not then it's a normal PHP file upload
+                if ($chunked) {
+                    error_log('FILE NAME: ' . $this->getFolderName() . DIRECTORY_SEPARATOR
+                    . $tmpFile['name']);
+                    $fileObject->setFromLocalFile($tmpFile['tmp_name'], $this->getFolderName() . DIRECTORY_SEPARATOR . $tmpFile['name']);
+                    $fileObject->write();
+                } else {
+                    $this->upload->loadIntoFile($tmpFile, $fileObject, $this->getFolderName());
+                }
+
+                $ids[] = $fileObject->ID;
+                error_log('T4 ID=' . $fileObject->ID);
+            } catch (Exception $e) {
+                error_log('T5');
+                $error_message = _t('FileAttachmentField.GENERALUPLOADERROR', 'Sorry, the file could not be saved at the current time, please try again later.');
+                return $this->httpError(400, $error_message);
+            }
+
+            if ($this->upload->isError()) {
+                error_log('T6');
+                return $this->httpError(400, implode(' ' . PHP_EOL, $this->upload->getErrors()));
+            }
+
+            if ($this->getTrackFiles()) {
+                error_log('T7');
+                $controller = Controller::has_curr() ? Controller::curr() : null;
+                $formClass = ($form) ? get_class($form) : '';
+
+                $trackFile = FileAttachmentFieldTrack::create();
+                if ($controller instanceof LeftAndMain) {
+                    // If in CMS (store DataObject or Page)
+                    $formController = $form->getController();
+                    $trackFile->ControllerClass = $formController->class;
+                    if (!$formController instanceof LeftAndMain) {
+                        $trackFile->setRecord($formController->getRecord());
+                    }
+                } else if ($formClass !== Form::class) {
+                    $trackFile->ControllerClass = $formClass;
+                } else {
+                    // If using generic 'Form' instance, get controller
+                    $trackFile->ControllerClass = $controller->class;
+                }
+                $trackFile->FileID = $fileObject->ID;
+                $trackFile->write();
+            }
+        }
+
+        $this->addValidFileIDs($ids);
+        error_log('T8');
+        $this->extend('onAfterUploadFiles', $ids);
+        return new HTTPResponse(implode(',', $ids), 200);
     }
 }
 
