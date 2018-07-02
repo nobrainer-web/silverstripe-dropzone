@@ -56,15 +56,12 @@ var UploadInterface = function (node, backend) {
         }
     };
 
-    console.log('THIS', this);
+    var that = this;
 
     // make an ajax request
     this.settings.chunksUploaded = function (file, done) {
         // All chunks have been uploaded. Perform any other actions
         currentFile = file;
-
-        console.log('Chunks uploaded ', node);
-        console.log(file);
 
         var settings = JSON.parse(node.getAttribute('data-config'));
 
@@ -77,24 +74,31 @@ var UploadInterface = function (node, backend) {
             + "&totalChunks=" + currentFile.upload.totalChunkCount,
             success: function (data) {
                 // Must call done() if successful
+                console.log('DATA', data);
+                console.log('T1', window.UploadInterface);
+                console.log('T2', UploadInterface);
+                console.log('THAT', that);
+                success = 1;
+                var df = new DroppedFile(that, {serverID: data, uploaded: true});
+
+                // remove the existing entry as it is blank.  With chunking one cannot have multiple files, a limitation
+                // of dropzone
+                df.removeAllFileIDS();
+                df.createInput();
                 done();
             },
             error: function (msg) {
                 currentFile.accepted = false;
+                console.log(msg.responseText);
                 this.backend._errorProcessing([currentFile], msg.responseText);
             }
         });
     };
 
 
-        console.log('Settings', this.settings);
-
-
         if (document.documentElement.classList && this.node.classList.contains('uploadable')) {
-        console.log('t1');
         this.backend = new backend(this.node, this.settings);
     } else if (this.node.className.indexOf('uploadable') !== -1) {
-        console.log('t2');
         this.backend = new backend(this.node, this.settings);
     }
 
@@ -143,8 +147,16 @@ UploadInterface.prototype = {
                     this.getFileByID(file.serverID).showError()
                 }.bind(this))
                         
-                .on('success', function (file, response) {                
-                    _this.persistFile(file, response);                
+                .on('success', function (file, response) {
+                    console.log(this.options.chunking);
+                    console.log('SUCCESS FILE', file);
+                    console.log('SUCCESS RESPONSE', response);
+
+                    // for chunking, the persistence is handled by the AJAX callback
+                    if (!this.options.chunking) {
+                        _this.persistFile(file, response);
+                    }
+
                 })
                 
                 .on('successmultiple', function (files, response) {                
@@ -160,6 +172,7 @@ UploadInterface.prototype = {
         
         q('[data-attachments] li', this.node).forEach(function(li) {
             var fileID = li.getAttribute('data-id');
+            console.log('New dropped file this', this);
             _this.droppedFiles.push(new DroppedFile(_this, {serverID: fileID, uploaded: true}));
 
             _this.bindEvents(li, fileID);
@@ -207,14 +220,21 @@ UploadInterface.prototype = {
      * @param  {File} file     The core File object
      * @param  {string} response The response from the server     
      */
-    persistFile: function (file, response) {        
+    persistFile: function (file, response) {
+        console.log('persistFile T1 - server id=', file.serverID);
+        console.log('response is of type ' , typeof(response));
         if(response.indexOf(',') !== -1) return;
+        console.log('persistFile T2');
 
         var droppedFile = this.getFileByID(file.serverID);
-        if(droppedFile) {            
+        console.log('Dropped file', droppedFile);
+
+        if(droppedFile) {
+            console.log('persistFile T3', response);
             file.serverID = response;
             droppedFile.persist();
-        }        
+        }
+        console.log('persistFile T4');
     },
 
     /**
@@ -223,6 +243,7 @@ UploadInterface.prototype = {
      */
     queueFile: function (file) {
         var droppedFile = new DroppedFile(this, file);
+        console.log('Queued file', file);
         this.droppedFiles.push(droppedFile);
         
         droppedFile.queue();
@@ -399,6 +420,13 @@ DroppedFile.prototype = {
         return this.uploader.node.querySelector('.attached-file-inputs');
     },
 
+    removeAllFileIDS: function () {
+        var holder = this.getHolder();
+        while (holder.firstChild) {
+            holder.removeChild(holder.firstChild);
+        }
+    },
+
     /**
      * Gets the DOM element that contains this file's UI (e.g. an LI tag)
      * @return {DOMElement}
@@ -485,7 +513,8 @@ DroppedFile.prototype = {
     /**
      * Saves the uploaded file as ready to submit in the form     
      */
-    persist: function () {        
+    persist: function () {
+        console.log('Create input T1');
         this.createInput();
         this.file.previewElement.classList.add('success');
         this.file.uploaded = true;
@@ -541,6 +570,7 @@ DroppedFile.prototype = {
      * Creates a new hidden input for sending this upload to the server     
      */
     createInput: function () {
+        console.log('Creating input for identifier ' , this.getIdentifier());
         this.getHolder().appendChild(createElementFromString(
             '<input type="hidden" class="input-attached-file" name="'+this.getName()+'" value="'+this.getIdentifier()+'">'
         ));
@@ -556,6 +586,7 @@ DroppedFile.prototype = {
             del.parentNode.removeChild(del);
         }
         if(!this.getInput()) {
+            console.log('Create input T2');
             this.createInput();        
         }
 
