@@ -861,9 +861,7 @@ class FileAttachmentField extends FileField {
         // delete the uploaded files
         for($i = 0; $i < $numberOfChunks; $i++) {
             $chunkFile = $tmp_dir . DIRECTORY_SEPARATOR . $uuid . DIRECTORY_SEPARATOR . $i . '.chunk';
-            if (file_exists($chunkFile)) {
-                unlink($chunkFile);
-            }
+            unlink($chunkFile);
         }
 
         unlink($tmp_dir);
