@@ -876,8 +876,11 @@ class FileAttachmentField extends FileField {
 
         $result = $this->extractFilesAsSilverStripeContent([$tmpFile], true);
 
+        // remove joined file
+        unlink($targetFile);
+        
         // remove directory
-        unlink($tmp_dir . DIRECTORY_SEPARATOR . $uuid);
+        rmdir($tmp_dir . DIRECTORY_SEPARATOR . $uuid);
 
         return $result;
     }
