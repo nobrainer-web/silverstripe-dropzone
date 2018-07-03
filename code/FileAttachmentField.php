@@ -902,7 +902,7 @@ class FileAttachmentField extends FileField {
             mkdir($uploadDir);
         }
 
-        if (file_exist($chunkFilePath)) {
+        if (file_exists($chunkFilePath)) {
             $targetFilePath = $tmp_dir . DIRECTORY_SEPARATOR . $dzUuid . DIRECTORY_SEPARATOR . $chunkIndex . '.chunk';
             error_log("Renaming $chunkFilePath as $targetFilePath");
             rename($chunkFilePath, $targetFilePath);
