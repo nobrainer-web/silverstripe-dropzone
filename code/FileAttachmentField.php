@@ -864,7 +864,7 @@ class FileAttachmentField extends FileField {
             unlink($chunkFile);
         }
 
-        unlink($tmp_dir);
+        unlink($tmp_dir . DIRECTORY_SEPARATOR . $uuid);
 
         // @todo check length of file and throw error if it's different
 
