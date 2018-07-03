@@ -893,9 +893,15 @@ class FileAttachmentField extends FileField {
         if (!file_exists($uploadDir)) {
             mkdir($uploadDir);
         }
-        $targetFilePath = $tmp_dir . DIRECTORY_SEPARATOR . $dzUuid . DIRECTORY_SEPARATOR . $chunkIndex . '.chunk';
-        error_log("Renaming $chunkFilePath as $targetFilePath");
-        rename($chunkFilePath, $targetFilePath);
+
+        if (file_exist($chunkFilePath)) {
+            $targetFilePath = $tmp_dir . DIRECTORY_SEPARATOR . $dzUuid . DIRECTORY_SEPARATOR . $chunkIndex . '.chunk';
+            error_log("Renaming $chunkFilePath as $targetFilePath");
+            rename($chunkFilePath, $targetFilePath);
+        } else {
+            error_log($chunkFilePath . ' not found');
+        }
+
     }
 
     /**
