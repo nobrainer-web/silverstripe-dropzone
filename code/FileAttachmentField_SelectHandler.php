@@ -9,6 +9,22 @@
 namespace UncleCheese\DropZone;
 
 
+use Embed\Adapters\File;
+use SilverStripe\Assets\Folder;
+use SilverStripe\Control\HTTPRequest;
+use SilverStripe\Core\Convert;
+use SilverStripe\Forms\CompositeField;
+use SilverStripe\Forms\GridField\GridField;
+use SilverStripe\Forms\GridField\GridFieldConfig;
+use SilverStripe\Forms\GridField\GridFieldDataColumns;
+use SilverStripe\Forms\GridField\GridFieldFilterHeader;
+use SilverStripe\Forms\GridField\GridFieldPaginator;
+use SilverStripe\Forms\GridField\GridFieldSortableHeader;
+use SilverStripe\Forms\TreeDropdownField;
+use SilverStripe\ORM\DataList;
+use SilverStripe\View\ArrayData;
+use SilverStripe\View\SSViewer;
+
 class FileAttachmentField_SelectHandler { //extends UploadField_Select {
 
     private static $allowed_actions = array (
