@@ -3,12 +3,12 @@
     "description": "An HTML5 upload field for the CMS and frontend forms.",
     "type": "silverstripe-vendormodule",
     "keywords": ["silverstripe", "upload", "uploader", "files", "forms", "cms"],
-	"license": "BSD-3-Clause",
+    "license": "BSD-3-Clause",
     "authors": [
-    {
-        "name": "Uncle Cheese",
-        "email": "unclecheese@leftandmain.com"
-    }
+        {
+            "name": "Uncle Cheese",
+            "email": "unclecheese@leftandmain.com"
+        }
     ],
     "require":
     {
@@ -22,11 +22,12 @@
     "minimum-stability": "dev",
     "prefer-stable": true,
     "extra": {
-	   "installer-name": "dropzone",
+        "installer-name": "dropzone",
         "expose": [
             "css",
             "javascript",
-            "images"
+            "images",
+            "templates"
         ]
     }
 }
