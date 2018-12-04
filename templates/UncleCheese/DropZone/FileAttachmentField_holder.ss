@@ -1,5 +1,5 @@
 <div id="$Name" class="field<% if $extraClass %> $extraClass<% end_if %> supported">
-    <% if $Title %><label class="left" for="$ID">$Title</label><% end_if %>
+    <%--<% if $Title %><label class="left" for="$ID">$Title</label><% end_if %>--%>
     <div id="{$Name}Dropzone" class="dropzone-holder <% if $isCMS %>backend<% end_if %> <% if $CanUpload %>uploadable<% end_if %>" data-config='$ConfigJSON'>
         <p>
             <% if $IsMultiple && $CanUpload %>
