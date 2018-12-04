@@ -251,35 +251,7 @@ class FileAttachmentField extends FileField
      */
     public function saveInto(DataObjectInterface $record)
     {
-        $fieldname = $this->getName();
-        if (!$fieldname) {
-            return $this;
-        }
-
-        // Handle deletions. This is a bit of a hack. A workaround for having a single form field
-        // post two params.
-        $deletions = Controller::curr()->getRequest()->postVar('__deletion__' . $this->getName());
-
-        if ($deletions) {
-            foreach ($deletions as $id) {
-                $this->deleteFileByID($id);
-            }
-        }
-
-        if (($relation = $this->getRelation($record))) {
-            $relation->setByIDList((array)$this->Value());
-        } elseif ($record->has_one($fieldname)) {
-            $record->{"{$fieldname}ID"} = $this->Value() ?: 0;
-        } elseif ($record->hasField($fieldname)) {
-            $record->$fieldname = is_array($this->Value()) ? implode(',', $this->Value()) : $this->Value();
-        }
-
-        if ($this->getTrackFiles()) {
-            $fileIDs = (array)$this->Value();
-            FileAttachmentFieldTrack::untrack($fileIDs);
-        }
-
-        return $this;
+        return parent::saveInto($record);
     }
 
     /**
